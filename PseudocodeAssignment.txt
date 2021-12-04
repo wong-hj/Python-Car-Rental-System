@@ -1,0 +1,2729 @@
+IMPORT datetime
+
+# Update car status when run BACKGROUND PROCESS #1 RUN ON STARTUP 
+
+DEFINE FUNCTION update_car_status():
+
+    READ file_fh FROM Booking.txt
+
+    IF file_fh.read() != "" THEN
+        READ file_fh FROM Booking.txt
+        DECLARE new_bookingdetails ""
+
+        LOOP line IN file_fh:
+
+            STRIP line BY ""
+            SPLIT line BY ","
+            check_pending = line
+
+            CONVERT (check_pending[3]) INTO datetime FORMAT (YYYY-MM-DD) AS payment_duedate
+
+            IF ((datetime.datetime.now() > payment_duedate) and (check_pending[6] == "pending")) THEN
+
+                DECLARE new_line ""
+
+                new_bookingdetails += new_line 
+
+            ELSE:
+
+                JOIN (check_pending) BY "," AS new_line
+
+                new_bookingdetails += new_line + "\n"
+
+            ENDIF
+
+        END LOOP
+
+        CLOSE file_fh
+
+        WRITE cardetails_fh FROM Booking.txt
+
+        WRITE(new_bookingdetails) IN cardetails_fh
+
+        CLOSE cardetails_fh
+
+    ENDIF
+
+END FUNCTION
+
+# Update car status (rented/available) BACKGROUND PROCESS #2 RUN ON STARTUP
+
+DEFINE FUNCTION update_car_rented():
+
+    READ file_fh FROM customerPayment.txt
+
+    
+    IF file_fh.read() != "" THEN
+        DECLARE carList []
+        DECLARE new_carstatusdetails ""
+        READ file_fh FROM customerPayment.txt
+
+        LOOP line IN file_fh:
+
+            STRIP line BY ""
+            SPLIT line BY ","
+            check_pending = line
+
+            CONVERT (check_pending[2]) INTO datetime FORMAT (YYYY-MM-DD) AS starting_date
+            
+            CONVERT (check_pending[3]) INTO datetime FORMAT (YYYY-MM-DD) AS ending_date
+
+            IF (starting_date < datetime.datetime.now() < ending_date) THEN
+                car_plate = check_pending[1]
+                APPEND (car_plate) IN carlist
+            ENDIF
+        
+        END LOOP
+
+        READ car_editStatus_fh FROM cars_details.txt
+        LOOP car_editstatus IN car_editStatus_fh:
+
+            STRIP line BY ""
+            SPLIT line BY ","
+            car_editstatus_list = line
+        
+
+            IF (car_editstatus_list[0] IN carlist car_plate) THEN
+
+                car_editstatus_list[8] = "rented" 
+
+                JOIN (car_editstatus_list) BY "," AS new_line
+
+                new_carstatusdetails += new_line + "\n" 
+
+                
+
+            ELSE:
+
+                JOIN (car_editstatus_list) BY "," AS new_line
+
+                new_carstatusdetails += new_line + "\n"
+            
+            ENDIF
+
+        END LOOP
+
+        CLOSE file_fh
+
+        WRITE cardetails_fh FROM cars_details.txt
+
+        WRITE(new_carstatusdetails) IN cardetails_fh
+
+        CLOSE cardetails_fh
+        
+    ENDIF
+
+END FUNCTION
+
+# Main Menu and Login Interface
+
+DEFINE FUNCTION login():
+
+    DISPLAY('''
+
+    Welcome to SUPER CAR RENTAL SERVICES (SCRS)
+
+    Would you like to login as:
+
+    - Admin? Enter A to continue.
+
+    - User? Enter U to continue.
+
+    - Enter E to exit''')
+
+
+    DOWHILE True:
+
+        DISPLAY("\nEnter your login type (A/U) or (E) to exit: ")
+        READ loginAns
+
+        IF ((loginAns == "A") or (loginAns == "a")) THEN
+
+            adminLogin()
+
+        ELSEIF ((loginAns == "U") or (loginAns == "u")) THEN
+
+            unregistered_customerPanel()
+
+        ELSEIF ((loginAns == "E") or (loginAns == "e")) THEN
+
+            exit_panel()
+
+        ELSE:
+
+            DISPLAY("Please insert a valid value.")
+
+            continue 
+
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Register for New Users
+
+DEFINE FUNCTION register():
+
+    DOWHILE True:
+
+        DISPLAY("ඞ REGISTER ඞ")
+
+        DISPLAY("Enter username: ")
+        READ register.username
+
+        DISPLAY("Enter password: ")
+        READ register.password
+
+        DISPLAY("Enter phone number: ")
+        READ register.phonenum
+
+        DISPLAY("Enter e-mail address: ")
+        READ register.email_address
+
+        IF ((length of register.username) <=1) or (length of register.password) <=1) or (length of register.phonenum) <=1) or (length of register.email_address) <=1)) THEN
+            DISPLAY("Values should be more than 1")
+            continue
+
+        ELSE:
+            READ user_fh FROM user_details.txt
+
+            IF ((register.username IN user_fh) or (register.phonenum IN user_fh) or (register.email_address IN user_fh)) THEN
+                DISPLAY("Username, Phone number or E-mail address already taken. Please Try Again")
+                continue
+
+            ELSE:
+                APPEND user_fh FROM user_details.txt
+
+                WRITE f"({register.username},{register.password},{register.phonenum},{register.email_address})" IN user_fh
+
+                CLOSE user_fh
+
+                DISPLAY("Congratulation! You are now part of us!")
+
+                DISPLAY("1. Login")
+
+                DISPLAY("2. Exit")
+
+            ENDIF
+
+        ENDIF
+
+        DOWHILE True:
+
+            DISPLAY("Enter your choice: ")
+            READ user_INPUT
+
+            IF (user_INPUT == "1") THEN
+                userLogin()
+
+            ELSEIF (user_INPUT == "2") THEN
+                exit_panel()
+
+            ELSE:
+                DISPLAY("Invalid.")
+                continue
+                
+            ENDIF
+
+        ENDDO   
+
+    ENDDO
+
+END FUNCTION
+
+# Exit panel
+
+DEFINE FUNCTION exit_panel():
+
+
+    DISPLAY("\nThank you for coming, See you again and have a great day.")
+
+
+    exit()
+
+END FUNCTION
+
+# Admin Login
+
+DEFINE FUNCTION adminLogin():
+
+    DISPLAY("\nYou're now logging in as Admin\n")
+
+    DISPLAY("Enter your username: ")
+    READ adminName
+
+    DISPLAY("Enter your password: ")
+    READ adminPassword
+
+    usernameValid = False
+
+    READ admin_fh FROM admin_details.txt
+
+    LOOP line IN admin_fh:
+        STRIP line BY ''
+        SPLIT line BY ',' 
+        adminusername AND adminpassword = line
+
+        IF (adminName == adminusername) THEN
+            usernameValid = TRUE
+            IF (adminPassword == adminpassword)) THEN
+                DISPLAY(f"\nWelcome!" {adminName})
+                DISPLAY("What would you like to do today?")
+                adminPanel()
+
+            ELSE:
+                DISPLAY ("Login Failed. Please Try Again.")
+                adminLogin()
+
+            ENDIF
+
+        ENDIF
+
+    ENDLOOP
+
+    CLOSE admin_fh
+
+    IF NOT (usernameValid) THEN
+        DISPLAY("Username or Password is invalid.")
+        DISPLAY("1. Try Again")
+        DISPLAY("2. Main Menu")
+    ENDIF
+
+    DOWHILE True
+        DISPLAY "Enter your choice: "
+        READ adminLogin_choice
+
+        IF (adminLogin_choice == "1") THEN
+            adminLogin()
+
+        ELSEIF (adminLogin_choice == "2") THEN
+            login()
+
+        ELSE
+            DISPLAY("Invalid INPUT. Choose 1 or 2.")
+            continue
+        ENDIF
+    
+    ENDDO
+
+END FUNCTION
+
+# User login 
+
+DEFINE FUNCTION userLogin():
+
+    foundUsername = False
+
+    DISPLAY("\nYou're now logging in as User.\n")
+
+    DISPLAY("Enter your username: ")
+    READ userName
+
+    DISPLAY("Enter your password: ")
+    READ userPassword
+
+    READ user_fh FROM user_details.txt
+
+    LOOP line IN user_fh:
+    
+        STRIP line BY ""
+        
+        SPLIT line BY ","
+
+	    username, password, phonenum, email_address = line
+
+        IF (userName == username) THEN
+
+            foundUsername = True
+
+            IF (userPassword == password) THEN
+
+                RETURN userName 
+
+            ELSE:
+
+                DISPLAY("Wrong password. Please Try Again.")
+
+                unregistered_customerPanel()
+
+            ENDIF
+
+        ENDIF
+
+    END LOOP
+    
+
+    IF NOT (foundUsername) THEN
+
+        DISPLAY("Username or Password is invalid, Try Again.")
+
+        DISPLAY("1. Try Again")
+
+        DISPLAY("2. Main Menu")
+
+        DOWHILE True:
+
+            DISPLAY("Enter your choice: ")
+            READ userLogin_choice
+
+            IF (userLogin_choice == "1") THEN
+
+                unregistered_customerPanel()
+
+            ELSEIF (userLogin_choice == "2") THEN
+
+                login()
+
+            ELSE:
+
+                DISPLAY("Invalid INPUT. Choose 1 or 2.")
+
+                continue
+            
+            ENDIF
+        
+        ENDDO
+    
+    ENDIF
+
+END FUNCTION
+
+# Display Cars Available to be rented
+
+DEFINE FUNCTION cars_available():
+
+    DISPLAY("===========================================================================")
+
+    DISPLAY("Cars Available to be rented:")
+
+    READ carsAvailable_fh FROM cars_details.txt
+
+    LOOP cars_to_be_rented IN carsAvailable_fh:
+
+        STRIP cars_to_be_rented BY ""
+        SPLIT cars_to_be_rented BY ","
+        available_cars = cars_to_be_rented
+
+        cars_available_line = f"Car: {available_cars[1]} {available_cars[2]} Car Rental Fee: {available_cars[7]}"
+
+        DISPLAY(f"{cars_available_line}\n")
+
+    END LOOP
+
+
+    DOWHILE True:
+
+        DISPLAY("\n1. Return to previous screen\n\nEnter a choice:")
+        READ rentCar_INPUT
+
+        IF (rentCar_INPUT == "1") THEN
+
+            unregistered_customerPanel()
+
+        ELSE:
+
+            DISPLAY("Invalid INPUT.")
+
+            continue
+
+        ENDIF
+        
+    ENDDO
+
+END FUNCTION
+
+# Pre-Modify Car Detail Panel
+
+DEFINE FUNCTION modify_add():
+
+    DISPLAY("==============================")
+    DISPLAY("1. Modify a car detail")
+    DISPLAY("2. Return to admin panel")
+    DISPLAY("==============================")
+
+    DOWHILE True
+        DISPLAY("Enter your choice: ")
+        READ modify_choice
+
+        IF (modify_choice == "1") THEN
+            car_details_modify()
+
+        ELSEIF (modify_choice == "2") THEN
+            adminPanel()
+
+        ELSE:
+            DISPLAY "Invalid INPUT. Choose 1 or 2."
+            continue
+
+        ENDIF
+
+    ENDDO
+
+EN FUNCTION
+
+
+# Modify Car Details
+
+DEFINE FUNCTION car_details_modify():
+    DISPLAY("===================================") 
+    DISPLAY("MODIFYING CAR DETAILS\n")
+
+    READ cars_fh FROM cars_details.txt
+    LOOP line IN car:
+        STRIP line BY ''
+        SPLIT line BY ','
+        allcars = line
+        DISPLAY allcars 
+    CLOSE cars_fh
+
+    found_car = False
+    DISPLAY("Choose car to be modified (Car Plate): ")
+    READ carChosen
+
+    DISPLAY("====================================")
+
+    READ cars_fh FROM cars_details.txt
+    LOOP line IN cars_fh:
+        STRIP line BY ''
+        SPLIT line BY ','
+        car_info = line
+
+        carPlate = car_info[0]
+
+        IF (carPlate == carChosen) THEN
+            found_car = True
+
+            DOWHILE True:
+                DISPLAY ("Currently Modifying: ", {car_info})
+                DISPLAY ("Choose a part to modify:")
+                DISPLAY ("0. Car Plate\n1. Car Brand\n2. Car Name\n3. Car Year\n4. Car Color\n5. Car Max Speed\n6. Car Pax\n7. Car Rental Fee\n8. Car Availability\n9. Modify another car\n10. Exit")
+
+                DISPLAY ("Enter your choice: ")
+                READ decision
+
+                TRY:
+                    CONVERT decision FORMAT into INTEGER
+                ENDTRY
+                EXCEPT:
+                    DISPLAY "Only Integers are allowed"
+                    continue
+                ENDEXCEPT
+
+                IF (0 <= decision <= 8) THEN
+                    DISPLAY (f"Changing '{car_info[decision]}' to: ")
+                    READ newvalue 
+
+                    DECLARE new_cardetails ""
+
+                    READ cars_fh1 FROM cars_details.txt
+                    LOOP line IN cars_fh1:
+                        IF (carChosen IN line) THEN
+                            STRIP line BY ''
+                            SPLIT line BY ','
+                            car_chosen_list = line
+
+                            LOOP count IN range of length of car_chosen_list:
+                                IF (count == decision) THEN
+
+                                    IF (decision == 5) THEN
+
+                                        car_chosen_list[count] = f"{newvalue}km/h"
+                                    ELSEIF (decision == 7) THEN
+
+                                        car_chosen_list[count] = f"RM{newvalue}"
+                                    ELSE:
+                                        car_chosen_list[count] = newvalue
+
+                                    ENDIF
+
+                                ENDIF
+
+                            ENDLOOP
+
+                            JOIN (car_chosen_list) BY ',' AS new_line
+                            new_cardetails += new_line + "\n"                                         
+
+                        ELSE:
+                            new_line = line
+                            new_cardetails += new_line
+                        ENDIF
+
+                    ENDLOOP
+
+                    WRITE cardetails_fh FROM cars_details.txt
+                    WRITE (new_cardetails) IN cardetails_fh
+                    CLOSE cardetails_fh
+
+                    DISPLAY("Successfully changed!")
+
+                    IF (decision == 5) THEN
+
+                        car_info[decision] = f"{newvalue}km/h"
+
+                    ELSEIF (decision == 7) THEN
+
+                        car_info[decision] = f"RM{newvalue}"
+
+                    ELSE:
+                        car_info[decision] = newvalue  
+                    
+                    ENDIF
+                                         
+                    continue
+
+                ELSEIF (decision == 9) THEN
+                    car_details_modify()
+
+                ELSEIF (decision == 10) THEN
+                    modify_add()
+
+                ELSE
+                    DISPLAY("Enter a value between 0 to 10")
+                    continue
+                ENDIF
+
+            ENDDO
+
+        ENDIF   
+
+    IF NOT (found_car) THEN
+
+        DISPLAY (f"Car plate '{carChosen}' not found. Unable to modify details.")
+        DISPLAY ("==============================")
+        DISPLAY ("1. Retry")
+        DISPLAY ("2. Return to previous panel")
+        DISPLAY ("==============================")
+
+        DOWHILE True:
+            DISPLAY ("Enter your choice: ")
+            READ modify_choice
+
+            IF (modify_choice == "1") THEN
+                car_details_modify()
+
+            ELSEIF (modify_choice == "2") THEN
+                modify_add()
+
+            ELSE
+                DISPLAY ("Invalid INPUT. Choose 1 or 2.")
+                continue
+
+            ENDIF
+
+        ENDDO
+
+    ENDIF
+
+END FUNCTION
+
+# Append a car and its details IN cars_details.txt
+
+DEFINE FUNCTION add_a_car()
+    DISPLAY "==========\nADDING A CAR\n==========\n"
+
+    DISPLAY ("Enter Car Plate: ")
+    READ car_plate
+
+    DISPLAY ("Enter Car Brand: ")
+    READ car_brand
+
+    DISPLAY ("Enter Car Name: ")
+    READ car_name
+
+    DISPLAY ("Enter Car Year: ")
+    READ car_year
+
+    DISPLAY ("Enter Car Color: ")
+    READ car_color 
+
+    DISPLAY ("Enter Car Max Speed: ")
+    READ car_maxspeed
+
+    DISPLAY ("Enter Car Pax: ")
+    READ car_pax
+
+    DISPLAY ("Enter Car Rental Fee: ")
+    READ car_rentalfee
+
+    DOWHILE True:
+        DISPLAY("Do you wish to add this car? (Y/N): ")
+        READ addcar_choice1
+
+        IF ((addcar_choice1 == "Y") or (addcar_choice1 == "y")) THEN
+
+            APPEND cardetails_fh FROM cars_details.txt
+            WRITE (f"{car_plate},{car_brand},{car_name},{car_year},{car_color},{car_maxspeed}km/h,{car_pax},RM{car_rentalfee},available,"\n") in cardetails_fh
+            CLOSE cardetails_fh
+
+            break
+
+        ELSEIF ((addcar_choice1 == "N") or (addcar_choice1 == "n")) THEN
+
+            print("Redirecting you back to Admin Panel.")
+            adminPanel()
+
+        ELSE:
+
+            print("Invalid input.")
+            continue
+        
+        ENDIF
+    
+    ENDDO
+
+    DISPLAY ("\n==============================")
+    DISPLAY ("Successfully added a car!")
+    DISPLAY ("1. Add another car")
+    DISPLAY ("OR")
+    DISPLAY ("2. Return to previous screen")
+    DISPLAY ("==============================")
+
+    DOWHILE True:
+    
+        DISPLAY ("Enter your choice: ")
+        READ addcar_choice2
+
+        IF (addcar_choice2 == "1") THEN
+            add_a_car()
+
+        ELSEIF (addcar_choice2 == "2") THEN
+            adminPanel()
+
+        ELSE
+            DISPLAY "Invalid INPUT. Choose 1 or 2." 
+            continue
+
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Display records
+
+DEFINE FUNCTION display_records():
+
+    DEFINE FUNCTION admin_display_rented_record():
+        DISPLAY("===========================================================================")
+        DISPLAY("Records of cars rented out now:")
+
+        cars_rented = 0
+
+        READ cars_rented_out_fh FROM cars_details.txt
+        LOOP cars_rented_out IN cars_rented_out_fh:
+            STRIP cars_rented_out BY ""
+            SPLIT cars_rented_out BY ","
+            rented_cars = cars_rented_out
+
+            IF (rented_cars[8] == "rented") THEN
+                cars_rented_line = f"Car Plate:{rented_cars[0]} Car brand:{rented_cars[1]} Car name:{rented_cars[2]} Car year:{rented_cars[3]} Car color:{rented_cars[4]} Car max speed:{rented_cars[5]} Car pax:{rented_cars[6]} Car Rental Fee:{rented_cars[7]}"
+                DISPLAY cars_rented_line  
+                cars_rented += 1
+            ENDIF
+
+        ENDLOOP
+        CLOSE cars_rented_out_fh
+
+        IF (cars_rented == 0) THEN
+            DISPLAY("No car is currently rented.")
+        ENDIF
+
+        DOWHILE True:
+
+            DISPLAY("\n1. Return to previous screen\n\nEnter a choice:")
+            READ rented_record_input
+
+            IF (rented_record_INPUT == "1") THEN
+                display_records()
+
+            ELSE:
+                DISPLAY("Invalid INPUT.")
+                continue
+            ENDIF
+
+        ENDDO
+
+    END FUNCTION
+
+    DEFINE FUNCTION admin_display_available_record():
+
+        DISPLAY("===========================================================================")
+
+        DISPLAY("Records of cars available now:")
+
+        cars_available = 0
+
+        READ cars_available_now_fh FROM cars_details.txt
+
+        LOOP cars_available_now IN cars_available_now_fh:
+            STRIP cars_available_now BY ""
+            SPLIT cars_available_now BY ","
+            available_cars = cars_available_now
+
+            IF (available_cars[8] == "available") THEN
+
+                cars_available_line = f"Car Plate:{available_cars[0]} Car brand:{available_cars[1]} Car name:{available_cars[2]} Car year:{available_cars[3]} Car color:{available_cars[4]} Car max speed:{available_cars[5]} Car pax:{available_cars[6]} Car Rental Fee:{available_cars[7]}"
+
+                DISPLAY(cars_available_line)
+
+                cars_available += 1
+
+            ENDIF
+
+        ENDLOOP
+
+        CLOSE cars_available_now_fh
+
+        IF (cars_available == 0) THEN
+
+            DISPLAY("No car is currently available.")
+
+        ENDIF
+
+        DOWHILE True:
+
+            DISPLAY("\n1. Return to previous screen\n\nEnter a choice:")
+            READ available_record_input
+
+            IF (available_record_input == "1") THEN
+
+                display_records()
+
+            ELSE:
+
+                DISPLAY("Invalid input.")
+
+                continue
+
+            ENDIF
+
+        ENDDO
+    
+    END FUNCTION
+
+    DEFINE FUNCTION admin_display_customer_bookings():
+
+        DISPLAY("===========================================================================")
+
+        DISPLAY("Records of customer bookings:")
+
+        READ bookingfile_fh IN Booking.txt
+
+        LOOP bookingline IN bookingfile_fh:
+
+            STRIP bookingline BY ""
+
+            SPLIT bookingline BY ","
+
+            user_info = bookingline
+
+            DISPLAY(f"Customer name: {user_info[0]}\tCar booked: {user_info[1]}\tBooking initiated date: {user_info[2]}\tCar book starting date: {user_info[4]}\tCar book end date: {user_info[5]}")
+
+        ENDLOOP
+
+        CLOSE bookingfile_fh
+
+        DISPLAY("Enter any key to RETURN to previous menu.\n")
+        READ anykey
+
+        display_records()
+    
+    END FUNCTION
+
+    DEFINE FUNCTION admin_display_customer_payment():
+
+        DISPLAY("===========================================================================")
+
+        DISPLAY("Records of customer payment:")
+
+        READ paymentfile_fh IN customerPayment.txt
+
+        LOOP paymentline IN paymentfile_fh:
+
+            STRIP paymentline BY ""
+
+            SPLIT paymentline BY ","
+
+            user_info = paymentline
+
+            DISPLAY(f"Customer name: {user_info[0]}\tCar booked: {user_info[1]}\tCar book starting date: {user_info[2]}\tCar book end date: {user_info[3]}\tDays Booked: {user_info[4]} days\tPayment method: {user_info[5]}\tPayment Total: {user_info[6]}\tPayment date: {user_info[7]}")
+
+        ENDLOOP
+
+        CLOSE paymentfile_fh
+
+        DISPLAY("Enter any key to RETURN to previous menu.\n")
+
+        READ anykey 
+
+        display_records()
+    
+    END FUNCTION
+
+    DISPLAY("===================================")
+
+    DISPLAY("1. Display records of cars rented out")
+
+    DISPLAY("2. Display records of cars available for rent")
+
+    DISPLAY("3. Display records of customer bookings")
+
+    DISPLAY("4. Display records of customer payments")
+
+    DISPLAY("5. Exit to admin panel")
+
+    DISPLAY("===================================")
+
+    DOWHILE True:
+
+        DISPLAY("Enter your choice: ")
+
+        READ admin_display_record_input
+
+        IF (admin_display_record_input == "1") THEN
+
+            admin_display_rented_record()       
+
+        ELSEIF (admin_display_record_input == "2") THEN
+
+            admin_display_available_record()
+
+        ELSEIF (admin_display_record_input == "3") THEN
+
+            admin_display_customer_bookings()
+
+        ELSEIF (admin_display_record_input == "4") THEN
+
+            admin_display_customer_payment()
+
+        ELSEIF (admin_display_record_input == "5") THEN
+
+            adminPanel()
+
+        ELSE:
+
+            DISPLAY("Enter a value between 1 to 5")
+
+            continue
+
+        ENDIF
+    
+    ENDDO
+
+END FUNCTION
+
+# Search records
+
+DEFINE FUNCTION search_records():
+
+    DEFINE FUNCTION search_bookings():
+
+        DISPLAY("Enter a name to search customer bookings.\nName listed below:")
+
+        READ searchBookings_fh FROM user_details.txt
+
+        LOOP name_line IN searchBookings_fh:
+
+            STRIP name_line BY ""
+
+            SPLIT name_line BY ","
+
+            all_names = name_line
+
+            DISPLAY(all_names[0])
+
+        CLOSE searchBookings_fh
+
+        DISPLAY("Enter a name (Case Sensitive): ")
+
+        READ search_booking_input
+
+        DISPLAY("Customer Booking records:")
+
+        found_user = False
+
+        READ bookingfile_fh FROM Booking.txt
+
+        LOOP bookingline IN bookingfile_fh:
+
+            STRIP bookingline BY ""
+
+            SPLIT bookingline BY ","
+
+            user_info = bookingline
+
+            username = user_info[0]
+
+            IF (username == search_booking_input) THEN
+
+                found_user = True
+
+                STRIP bookingline BY ""
+
+                SPLIT bookingline BY ","
+
+                user_info = bookingline
+
+                DISPLAY(f"Customer name: {user_info[0]}\tCar booked: {user_info[1]}\tBooking initiated date: {user_info[2]}\tCar book starting date: {user_info[4]}\tCar book end date: {user_info[5]}")
+
+            ENDIF
+        
+        ENDLOOP
+
+        CLOSE bookingfile_fh
+
+        IF NOT (found_user) THEN
+
+            DISPLAY("User does not have any booking records (YET).\nRedirecting you back to the panel.")
+
+        ENDIF
+
+        search_records()
+
+    END FUNCTION
+
+    DEFINE FUNCTION search_payment():
+
+        DISPLAY("Enter a name to search customer payment records.\nName listed below:")
+
+        READ searchPayment_fh FROM user_details.txt
+
+        LOOP name_line IN searchPayment_fh:
+
+            STRIP name_line BY ""
+
+            SPLIT name_line BY ","
+
+            all_names = name_line
+
+            DISPLAY(all_names[0])
+        
+        ENDLOOP
+
+        CLOSE searchPayment_fh
+
+        DISPLAY("Enter a name (Case Sensitive): ")
+
+        READ search_booking_input
+
+        DISPLAY("Customer Payment records:")
+
+        found_user = False
+
+        READ paymentfile_fh FROM customerPayment.txt
+
+        LOOP paymentline IN paymentfile_fh:
+
+            STRIP paymentline BY ""
+
+            SPLIT paymentline BY ","
+
+            user_info = paymentline
+
+            username = user_info[0]
+
+            IF (username == search_booking_input) THEN
+
+                found_user = True
+
+                STRIP paymentline BY ""
+
+                SPLIT paymentline BY ","
+
+                user_info = paymentline
+
+                DISPLAY(f"Customer name: {user_info[0]}\tCar booked: {user_info[1]}\tCar book starting date: {user_info[2]}\tCar book end date: {user_info[3]}\tDays Booked: {user_info[4]} days\tPayment method: {user_info[5]}\tPayment Total: {user_info[6]}\tPayment date: {user_info[7]}")
+            
+            ENDIF
+
+        ENDLOOP
+
+        CLOSE paymentfile_fh
+
+        IF NOT (found_user) THEN
+
+            DISPLAY("User did not make any payment (YET).\nRedirecting you back to the panel~~~")
+
+        ENDIF
+
+        search_records()
+
+    END FUNCTION
+
+    DISPLAY("\n\n==================================================")
+
+    DISPLAY("What are you searching for?")
+
+    DISPLAY("1. Customer Bookings")
+
+    DISPLAY("2. Customer Payment for a specific time duration")
+
+    DISPLAY("3. Return to previous screen")
+
+    DISPLAY("==================================================")
+
+    DOWHILE True:
+
+        DISPLAY("\nEnter a number: ")
+
+        READ search_input
+
+        IF (search_input == "1") THEN
+
+            search_bookings()
+
+        ELSEIF (search_input == "2") THEN
+
+            search_payment()
+
+        ELSEIF (search_input == "3") THEN
+
+            adminPanel()
+
+        ELSE:
+
+            DISPLAY("Enter value between 1 or 2 -_-.")
+
+            continue
+
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Return a rented car
+
+DEFINE FUNCTION return_rented_car():
+
+    DISPLAY("===========================================================================")
+
+    DISPLAY("Records of cars rented:")
+
+    READ cars_rented_out_fh FROM cars_details.txt
+
+    LOOP cars_rented_out IN cars_rented_out_fh:
+
+        STRIP cars_rented_out BY ""
+
+        SPLIT cars_rented_out BY ","
+
+        rented_cars = cars_rented_out
+
+        IF (rented_cars[8] == "rented") THEN
+
+            cars_rented_line = f"Car Plate:{rented_cars[0]} Car brand:{rented_cars[1]} Car name:{rented_cars[2]} Car year:{rented_cars[3]} Car color:{rented_cars[4]} Car max speed:{rented_cars[5]} Car pax:{rented_cars[6]} Car Rental Fee:{rented_cars[7]}"
+
+            DISPLAY(cars_rented_line)
+
+        ENDIF
+
+    ENDLOOP
+
+    CLOSE cars_rented_out_fh
+
+    DOWHILE True:
+
+        DISPLAY("\n1. Return a rented car above\n2. Return to previous screen\n\nEnter a choice:")
+
+        READ RETURN_rented_INPUT 
+
+        IF (RETURN_rented_INPUT == "1") THEN
+
+            DISPLAY("Choose car to be RETURNed (Car Plate): ")
+
+            READ returncar_chosen
+
+            DISPLAY("====================================")
+
+            found_car = False
+
+            READ cars_details_fh FROM cars_details.txt
+
+            LOOP line IN cars_details_fh:
+
+                STRIP line BY ""
+
+                SPLIT line BY ","
+
+                car_info = line
+
+                carPlate = car_info[0]
+
+                IF ((carPlate == returncar_chosen) and (car_info[8] == "rented")) THEN
+
+                    found_car = True
+
+                    DOWHILE True:
+
+                        DISPLAY(f"Currently returning: {car_info}")
+
+                        DISPLAY("Are you sure?")
+
+                        DISPLAY("Enter your choice (YES/NO): ")
+
+                        READ decision 
+
+                        IF (decision == "YES") THEN
+
+                            READ file_fh FROM cars_details.txt
+
+                            DECLARE new_cardetails ""
+
+                            LOOP line IN file_fh:
+
+                                IF (returncar_chosen) IN line THEN
+
+                                    STRIP line BY ""
+
+                                    SPLIT line BY ","
+
+                                    car_chosen_list = line.strip().split(",")                                 
+
+                                    car_chosen_list[8] = "available" 
+
+                                    JOIN (car_chosen_list) BY "," AS new_line
+
+                                    new_cardetails += new_line + "\n"                                         
+
+                                ELSE:
+
+                                    new_line = line
+
+                                    new_cardetails += new_line
+
+                                ENDIF
+
+                            ENDLOOP
+
+                            file_fh.close()
+
+                            
+
+                            WRITE cardetails_fh FROM cars_details.txt
+
+                            WRITE (new_cardetails) IN cardetails_fh
+
+                            CLOSE cardetails_fh
+
+                            DISPLAY("Successfully returned!")
+
+                            adminPanel()
+
+                        ELSEIF (decision == "NO") THEN
+
+                            RETURN_rented_car()
+
+                        ELSE:
+
+                            DISPLAY("Invalid INPUT. Case sensitive.")
+
+                            continue
+
+                        ENDIF
+
+                ENDIF
+
+            ENDLOOP
+
+            IF NOT (found_car) THEN
+
+                DISPLAY(f"Car plate '{returncar_chosen}' not found/not rented. Unable to RETURN car.")
+
+                DISPLAY("==============================")
+
+                DISPLAY("1. Retry")
+
+                DISPLAY("2. Return to previous panel")
+
+                DISPLAY("==============================")
+
+                DOWHILE True:
+
+                    DISPLAY("Enter your choice: ")
+
+                    READ return_choice 
+
+                    IF (RETURN_choice == "1") THEN
+
+                        return_rented_car()
+
+                    ELSEIF (RETURN_choice == "2") THEN
+
+                        adminPanel()
+
+                    ELSE:
+
+                        DISPLAY("Invalid INPUT. Choose 1 or 2.")
+
+                        continue
+
+                    ENDIF
+
+                ENDDO
+
+            ENDIF
+
+        ELSEIF (RETURN_rented_INPUT == "2") THEN
+
+            adminPanel()
+
+        ELSE:
+
+            DISPLAY("Invalid INPUT.")
+
+            continue
+
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+#Admin Panel 
+
+DEFINE FUNCTION adminPanel():
+
+    DISPLAY("===================================")
+
+    DISPLAY("1. Add cars to be rented out")
+
+    DISPLAY("2. Modify car details")
+
+    DISPLAY("3. Display records")
+
+    DISPLAY("4. Search records")
+
+    DISPLAY("5. Return a rented car")
+
+    DISPLAY("6. Return to login screen")
+
+    DISPLAY("7. Exit")
+
+    DISPLAY("===================================")
+
+    DOWHILE True:
+
+        DISPLAY("Enter your choice: ")
+
+        READ admin_INPUT
+
+        IF (admin_INPUT == "1") THEN
+
+            add_a_car()
+
+        ELSEIF (admin_INPUT == "2") THEN
+
+            modify_add()
+
+        ELSEIF (admin_INPUT == "3") THEN
+
+            display_records()
+
+        ELSEIF (admin_INPUT == "4") THEN
+
+            search_records()    
+
+        ELSEIF (admin_INPUT == "5") THEN
+
+            RETURN_rented_car()
+
+        ELSEIF (admin_INPUT == "6") THEN
+
+            login()
+
+        ELSEIF (admin_INPUT == "7") THEN
+
+            exit_panel()
+
+        ELSE:
+
+            DISPLAY("Enter a value between 1 to 7.")
+
+            continue
+        
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Modify Details Menu
+
+DEFINE FUNCTION modify_details(customerUsername1):
+
+    DISPLAY("=================================================")
+
+    DISPLAY("1. Modify your personal details.")
+
+    DISPLAY("OR")
+
+    DISPLAY("2. Return to previous menu.")
+
+    DISPLAY("=================================================")
+
+    DOWHILE True:
+
+        DISPLAY("\nChoose 1 or 2: ")
+        READ modifyDetailsInput
+
+        IF (modifyDetailsInput == "1") THEN
+
+            modify_personal_details(customerUsername1)
+
+        ELSEIF (modifyDetailsInput == "2") THEN
+
+            registered_customerPanel(customerUsername1)
+
+        ELSE:
+
+            DISPLAY("Invalid INPUT.")
+
+            continue
+        
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Modify Personal Details
+
+DEFINE FUNCTION modify_personal_details(customerUsername1):
+
+    found_user = False
+
+    DISPLAY("===================================")
+
+    DISPLAY("MODIFYING PERSONAL DETAILS\n")
+
+    DISPLAY("Enter your current username: ")
+    READ current_username
+
+    DISPLAY("Enter your current password: ")
+    READ current_password
+    
+    READ userfile_fh FROM user_details.txt
+
+    LOOP line IN userfile_fh:
+
+        STRIP line BY ""
+        STRIP line BY ","
+        user_info = line
+
+        username = user_info[0]
+
+        password = user_info[1]
+
+        IF ((username == current_username) and (password == current_password)) THEN
+
+            found_user = True
+
+            DOWHILE True:
+
+                DISPLAY("====================================")
+
+                DISPLAY(f"Currently Modifying: {user_info}")
+
+                DISPLAY("Choose a part to modify:")
+
+                DISPLAY("0. User name\n1. User password\n2. Phone Number\n3. E-mail address\n4. Return to previous screen\n5. Exit\n")
+
+                DISPLAY("Enter your choice: ")
+                READ decision
+
+                TRY:
+
+                    decision = int(decision)
+                
+                END TRY
+                EXCEPT:
+
+                    DISPLAY("Only Integers are allowed")
+
+                    continue
+
+                END EXCEPT
+
+                IF (decision IN [0,2,3]) THEN
+
+                    READ file_fh FROM user_details.txt
+
+                    line = file_fh.read()
+
+                    DISPLAY(f"Changing '{user_info[decision]}' to: ")
+                    READ newvalue
+
+                    IF (newvalue NOT IN line) THEN
+
+                        READ file_fh FROM user_details.txt
+
+                        DECLARE new_userdetails ""
+
+                        LOOP line IN file_fh:
+
+                            IF (current_username IN line) THEN
+   
+                                STRIP line BY ""
+                                STRIP line BY ","
+                                user_chosen_list = line                        
+
+                                LOOP count IN range of length user_chosen_list:
+
+                                    IF (count == decision) THEN                  
+
+                                        user_chosen_list[count] = newvalue
+
+                                    END IF
+
+                                END LOOP
+
+                                JOIN (user_chosen_list) BY "," AS new_line
+
+                                new_userdetails += new_line + "\n"                                         
+                                
+
+                            ELSE:
+
+                                new_line = line
+
+                                new_userdetails += new_line
+
+                            ENDIF
+
+                        ENDLOOP
+
+                        WRITE userdetails_fh FROM user_details.txt
+
+                        WRITE (new_userdetails) IN userdetails_fh
+
+                        CLOSE userdetails_fh
+
+                        user_info[decision] = newvalue
+
+                        DISPLAY("\nSuccessfully changed!")
+
+                        continue                
+
+                    ELSE:
+
+                        DISPLAY(f"\n'{newvalue}' is taken. Please use another value.\n")                            
+
+                        continue    
+
+                    ENDIF
+
+                ELSEIF (decision == 1) THEN
+
+                    DISPLAY(f"Changing '{user_info[decision]}' to: ")
+                    READ newpassword
+
+                    DOWHILE True:
+
+                        DISPLAY("Enter new password again: ")
+                        READ confirm_new_password
+
+                        IF (confirm_new_password == newpassword) THEN
+
+                            READ file_fh FROM user_details.txt
+
+                            DECLARE new_userdetails ""
+
+                            LOOP line IN file_fh:
+
+                                IF (current_username IN line) THEN
+                               
+                                    STRIP line BY ""
+                                    SPLIT line BY ","
+                                    user_chosen_list = line
+
+                                    LOOP count IN range of length user_chosen_list:
+
+                                        IF (count == decision) THEN                                
+
+                                            user_chosen_list[count] = newpassword
+                                        
+                                        ENDIF
+                                    
+                                    END LOOP
+
+                                    JOIN (user_chosen_list) BY "," AS new_line
+
+                                    new_userdetails += new_line + "\n"                                         
+
+                                ELSE:
+
+                                    new_line = line
+
+                                    new_userdetails += new_line
+
+                                ENDIF
+
+                            END LOOP
+
+                            CLOSE file_fh
+
+                            WRITE userdetails_fh FROM user_details.txt
+                           
+                            WRITE (new_userdetails) IN userdetails_fh
+
+                            CLOSE new_userdetails
+
+                            DISPLAY("\nDone! Redirecting you to the login page.")
+
+                            login()
+
+                        ELSE:
+
+                            DISPLAY("Incorrect password INPUT.")
+
+                            continue
+
+                        ENDIF
+
+                    ENDDO
+
+
+                ELSEIF (decision == 4) THEN
+
+                    modify_details(customerUsername1)
+            
+
+                ELSEIF (decision == 5) THEN
+
+                    exit_panel()
+
+                ELSE:
+
+                    DISPLAY("Enter a value between 0 to 5")
+
+                    continue
+                
+                ENDIF
+
+            ENDDO
+
+        ENDIF
+
+    END LOOP        
+
+    IF NOT (found_user) THEN
+
+        DISPLAY("Username invalid. Unable to modify details.")
+
+        DISPLAY("==============================")
+
+        DISPLAY("1. Retry")
+
+        DISPLAY("2. Return to previous panel")
+
+        DISPLAY("==============================")
+
+        DOWHILE True:
+
+            DISPLAY("Enter your choice: ")
+            READ modify_choice
+
+            IF (modify_choice == "1")THEN
+
+                modify_personal_details()
+
+            ELSEIF (modify_choice == "2") THEN
+
+                modify_details()
+
+            ELSE:
+
+                DISPLAY("Invalid INPUT. Choose 1 or 2.")
+
+                continue
+            
+            ENDIF
+        
+        ENDDO
+
+    ENDIF
+
+END FUNCTION
+
+# Display Personal Rental History
+
+DEFINE FUNCTION rental_history(customerUsername1):
+
+    found_user = False
+
+    DISPLAY("Personal rental history:")
+
+    READ paymentfile_fh FROM customerPayment.txt
+
+    LOOP paymentline IN paymentfile_fh:
+
+        STRIP paymentline BY ""
+        SPLIT paymentline BY ","
+        user_info = paymentline
+
+        username = user_info[0]
+
+        IF (username == customerUsername1) THEN
+
+            found_user = True
+
+            DISPLAY(f"Customer name: {user_info[0]}\tCar booked: {user_info[1]}\tCar book starting date: {user_info[2]}\tCar book end date: {user_info[3]}\tDays Booked: {user_info[4]} days\tPayment method: {user_info[5]}\tPayment Total: {user_info[6]}\tPayment date: {user_info[7]}")
+
+            DISPLAY("Enter any key to be redirected back to the panel.")
+            READ anykey
+        ENDIF
+
+    END LOOP
+
+    IF NOT (found_user) THEN
+
+        DISPLAY("\nYou do not have any rental history (YET).\nRedirecting you back to the panel.\n")
+
+    END IF
+
+    CLOSE paymentfile_fh
+
+    registered_customerPanel(customerUsername1)
+
+END FUNCTION
+
+# Display Cars Available to be rented
+
+DEFINE FUNCTION cars_details(customerUsername1):
+
+    DISPLAY("===========================================================================")
+
+    DISPLAY("Cars Available to be rented:")
+
+    READ rented_car FROM cars_details.txt
+
+    LOOP cars_to_be_rented IN rented_car:
+
+        STRIP cars_to_be_rented BY ""
+        SPLIT cars_to_be_rented BY ","
+        available_cars = cars_to_be_rented
+
+        IF (available_cars[8] == "available") THEN
+
+            cars_available_line = f" Car Plate: {available_cars[0]} Car Brand: {available_cars[1]} Car Name: {available_cars[2]} Car Year: {available_cars[3]} Car Color: {available_cars[4]} Car Max Speed: {available_cars[5]} Car Pax: {available_cars[6]} Car Rental Fee: {available_cars[7]}"
+
+            DISPLAY(f"{cars_available_line}\n")
+        
+        ENDIF
+
+    END LOOP
+
+
+    DOWHILE True:
+
+        DISPLAY("\n1. Return to previous screen\n\nEnter a choice:")
+        READ rentCar_INPUT
+
+        IF (rentCar_INPUT == "1") THEN
+
+            registered_customerPanel(customerUsername1)
+
+        ELSE:
+
+            DISPLAY("Invalid input.")
+
+            continue
+        
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Pre-Booking Screen
+
+DEFINE FUNCTION select_book_car(customerUsername1):
+
+    DISPLAY("===========================================================================")
+
+    DISPLAY("Pre-Booking Screen:")
+
+    READ cars_to_be_rented_fh FROM cars_details.txt
+
+    LOOP cars_to_be_rented IN cars_to_be_rented_fh:
+
+        STRIP cars_to_be_rented BY ""
+        SPLIT cars_to_be_rented BY ","
+        available_cars = cars_to_be_rented
+
+        cars_available_line = f" Car: {available_cars[0]}, {available_cars[1]} {available_cars[2]} Car Rental Fee: {available_cars[7]}"
+
+        DISPLAY(f"{cars_available_line}\n")
+    
+    ENDLOOP
+
+
+    DOWHILE True:   
+
+        DISPLAY("\n1. Select a car to book\n2. Return to previous screen\n\nEnter a choice:")
+        READ bookCar_input
+
+        IF (bookCar_input == "1") THEN
+
+            select_book_car_2(customerUsername1)
+
+        ELSEIF (bookCar_input == "2") THEN
+
+            registered_customerPanel(customerUsername1)
+
+        ELSE:
+
+            DISPLAY("Invalid input.")
+
+            continue
+        
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Select or Book a car
+
+DEFINE FUNCTION select_book_car_2(customerUsername1):
+
+    found_car = False
+
+    DOWHILE True:
+
+        DISPLAY("Enter car plate of the car you wish to book: ")
+        READ car_to_book
+
+        READ carbook_fh FROM cars_details.txt
+
+        LOOP line IN carbook_fh:
+
+            STRIP line BY ""
+            SPLIT line BY ","
+            car_info = line
+
+            carPlate = car_info[0]
+
+            IF (carPlate == car_to_book) THEN
+
+                found_car = True
+
+                car_info_details = f"Car Plate: {car_info[0]} Car Brand: {car_info[1]} Car Name: {car_info[2]} Car Year: {car_info[3]} Car Color: {car_info[4]} Car Max Speed: {car_info[5]} Car Pax: {car_info[6]} Car Rental Fee: {car_info[7]}"
+
+                DISPLAY(car_info_details)
+
+            ENDIF
+
+        END LOOP
+
+
+        IF (found_car == False) THEN
+
+            DISPLAY("Car not found.")
+
+            continue
+        
+        ENDIF
+
+        READ check_booking FROM Booking.txt
+
+        LOOP check_booking_lines IN check_booking:
+
+            IF (car_to_book IN check_booking_lines) THEN
+
+                STRIP line BY ""
+                SPLIT line BY ","
+                car_to_book = line
+
+		        MAP DATA (CONVERT car_booked[4] FORMAT into INTEGER and SPLIT car_booked[4] BY "-") TO year, month, day
+
+                CONVERT (year, month, day) INTO datetime FORMAT AS check_date
+
+                IF ((customerUsername1 == car_booked[0]) and (car_to_book == car_booked[1]) and (datetime.datetime.now() <= check_date)) THEN
+
+                    DISPLAY("You have booked this car, please wait until your rental is over to book it again.")
+
+                    DISPLAY("Enter any key to select another car: ")
+                    
+                    READ anykey
+
+                    select_book_car(customerUsername1)
+                
+                ENDIF
+            
+            ENDIF
+        
+        END LOOP
+
+        READ check_booking FROM Booking.txt
+
+        LOOP check_booking_line IN check_booking:
+
+            IF (car_to_book IN check_booking_line) THEN
+
+                STRIP line BY ""
+                SPLIT line BY ","
+                car_to_book = line 
+                
+                CONVERT car_is_booked[4] TO FORMAT YEAR-MONTH-DAY AS car_booked_date
+
+                DISPLAY(f"Someone else has booked this car on {car_is_booked[4]} to {car_is_booked[5]}, you can rent before {car_is_booked[4]} or after {car_is_booked[5]}.")
+            
+            ENDIF
+        
+        END LOOP
+
+        break
+    
+    ENDDO
+
+    
+    DOWHILE True:
+
+        DISPLAY("Is this the car you wish to book? (Y/N): ")                    
+        READ confirm_book_car
+
+        IF ((confirm_book_car == "Y") or (confirm_book_car == "y")) THEN
+            DISPLAY("The car will no longer remain booked if user has not confirm the payment before the next day\nPlease write the date you want to start your car rental.")
+            DOWHILE True:
+                              
+
+                DISPLAY("Enter date in YYYY-MM-DD(YEAR-MONTH-DAY) format: ")
+                READ date
+
+                TRY:
+                    
+                    MAP DATA (CONVERT date FORMAT into INTEGER and SPLIT date BY "-") TO year, month, day
+
+                    CONVERT (year, month, day) INTO datetime FORMAT AS starting_date
+                    
+                    ENDIF
+
+                END TRY
+
+                except ValueError:
+
+                    DISPLAY("Enter correct format.")
+
+                    continue
+                
+                END EXCEPT
+
+                IF (starting_date > datetime.datetime.now()) THEN
+
+                    break
+                
+                ELSE:
+
+                    DISPLAY("Enter a legit date.")
+
+                    continue
+
+            DOWHILE True:
+
+                DISPLAY("How many days do you wish to rent the car?: ")
+                READ rent_duration
+
+                TRY:
+
+                    rent_duration = int(rent_duration)
+
+                END TRY
+
+                except ValueError:
+
+                    DISPLAY("Only integers are allowed.")
+
+                    continue
+                
+                END EXCEPT
+
+                IF (rent_duration > 0) THEN
+
+                    break
+
+                ELSE:
+
+                    DISPLAY("Enter a value more than 0.")
+
+                    continue
+
+                ENDIF
+
+            ENDDO
+
+            SET days TO rent_duration using timedelta FUNCTION AS days_added
+
+            ending_date = starting_date + days_added
+
+            IF (open("Booking.txt", "r").read() == "") THEN
+
+                DOWHILE True:
+
+                    DISPLAY("Confirm booking?(Y/N)\nChoice: ")
+                    READ confirm_booking
+
+                    IF ((confirm_booking == "Y") or (confirm_booking == "y")) THEN
+
+                        break
+
+                    ELSEIF ((confirm_booking == "N") or (confirm_booking == "n")) THEN
+
+                        select_book_car(customerUsername1)
+
+                    ELSE:
+
+                        DISPLAY("Invalid INPUT.")
+
+                        continue
+
+                    ENDIF
+
+                ENDDO
+
+                username = customerUsername1          
+
+                WRITE bookingdetails_fh FROM Booking.txt
+
+                SET days TO 1 using timedelta FUNCTION AS payment_timelimit
+
+                CONVERT TODAY Date INTO DATE FORMAT
+                TODAY DATE FORMAT + payment_timelimit AS payment_datelimit
+
+                WRITE (f"{username},{car_to_book},{datetime.datetime.now().date()},{payment_datelimit},{starting_date.date()},{ending_date.date()},pending\n") IN bookingdetails_fh
+
+                CLOSE bookingdetails_fh
+
+                DISPLAY(f"Successfully Booked!")
+
+                registered_customerPanel(customerUsername1)
+
+            ELSE:
+
+                car_book = False
+                READ checkdate_fh FROM Booking.txt
+
+                IF (car_to_book IN checkdate_fh.read()) THEN
+
+                    LOOP line IN checkdate_fh:
+
+                        STRIP line BY ""
+                        SPLIT line BY ","
+                        car_is_booked = line
+
+                        CONVERT (car_is_booked[4]) INTO YYYY-MM-DD FORMAT AS car_booked_date
+                
+                        CONVERT (car_is_booked[5]) INTO YYYY-MM-DD FORMAT AS car_booked_end_date
+
+
+                        IF ((car_booked_date<=starting_date<=car_booked_end_date) OR (car_booked_date<=ending_date<=car_booked_end_date) OR (starting_date<=car_booked_date<=ending_date) or (starting_date<=car_booked_end_date<=ending_date)) THEN
+
+                            DISPLAY("Your car booking has interfered with another user's booking. Please choose another date.")
+
+                            select_book_car(customerUsername1)
+
+                        ELSE:
+
+                            car_book = True
+
+                        ENDIF
+                    
+                    END LOOP
+
+                ELSE:
+
+                    DOWHILE True:
+
+                        DISPLAY("Confirm booking?(Y/N)\nChoice: ")
+                        READ confirm_booking
+
+                        IF ((confirm_booking == "Y") or (confirm_booking == "y")) THEN
+
+                            username = customerUsername1          
+
+                            APPEND bookingdetails_fh FROM Booking.txt
+
+                            SET days TO 1 using timedelta FUNCTION AS payment_timelimit
+                            
+                            CONVERT TODAY Date INTO DATE FORMAT
+                            TODAY DATE FORMAT + payment_timelimit AS payment_datelimit
+
+                            WRITE (f"{username},{car_to_book},{datetime.datetime.now().date()},{payment_datelimit},{starting_date.date()},{ending_date.date()},pending\n") IN bookingdetails_fh
+
+                            CLOSE bookingdetails_fh
+
+                            DISPLAY(f"Successfully Booked!")
+
+                            registered_customerPanel(customerUsername1)
+
+                        ELSEIF ((confirm_booking == "N") or (confirm_booking == "n")) THEN
+
+                            select_book_car(customerUsername1)
+
+                        ELSE:
+
+                            DISPLAY("Invalid input.")
+
+                            continue
+                        
+                        ENDIF
+
+                    ENDDO
+
+                ENDIF
+
+                DOWHILE (car_book == True):
+
+                    DISPLAY("Confirm booking?(Y/N)\nChoice: ")
+                    READ confirm_booking
+
+                    IF ((confirm_booking == "Y") or (confirm_booking == "y")) THEN
+
+                        username = customerUsername1          
+
+                        APPEND bookingdetails_fh FROM Booking.txt
+
+                        SET days TO 1 using timedelta FUNCTION AS payment_timelimit
+                            
+                        CONVERT TODAY Date INTO DATE FORMAT
+                        TODAY DATE FORMAT + payment_timelimit AS payment_datelimit
+
+                        WRITE (f"{username},{car_to_book},{datetime.datetime.now().date()},{payment_datelimit},{starting_date.date()},{ending_date.date()},pending\n") IN bookingdetails_fh
+
+                        CLOSE bookingdetails_fh
+
+                        DISPLAY(f"Successfully Booked!")
+
+                        registered_customerPanel(customerUsername1)
+
+
+                    ELSEIF ((confirm_booking == "N") or (confirm_booking == "n")) THEN
+
+                        select_book_car(customerUsername1)
+
+                    ELSE:
+
+                        DISPLAY("Invalid INPUT.")
+
+                        continue
+                    
+                    ENDIF
+
+                ENDDO
+
+            ENDIF
+                     
+
+        ELSEIF (confirm_book_car == "N") or (confirm_book_car == "n") THEN
+
+            select_book_car(customerUsername1)
+
+        ELSE:
+
+            DISPLAY("Invalid INPUT.")
+
+            continue
+        
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+# Customer Payment 
+
+DEFINE FUNCTION payment(customerUsername1):
+
+    user_name = customerUsername1
+
+    READ find_car_booking FROM Booking.txt
+
+    user_found = False
+    LOOP line IN find_car_booking:
+
+        STRIP line BY ""
+        SPLIT line BY ","
+        user_info = line
+
+        username = user_info[0]
+
+        IF ((username == user_name) and (user_info[6] == "pending")) THEN
+
+            user_found = True
+            STRIP line BY ""
+            SPLIT line BY ","
+            user_booking_info = line
+
+            DISPLAY(user_booking_info)
+        ENDIF
+
+    END LOOP
+
+    IF NOT (user_found) THEN
+
+        DOWHILE True:
+
+            DISPLAY("===================================================")
+
+            DISPLAY(f"{user_name}, you have no pending bookings to pay!")
+
+            DISPLAY("===================================================")
+
+            DISPLAY("1. Return to previous screen\nEnter 1: ")
+            READ choice
+
+            IF (choice == "1") THEN
+
+                registered_customerPanel()
+
+            ELSE:
+
+                DISPLAY("Invalid INPUT.")
+
+                continue
+            
+            ENDIF
+        
+        ENDDO
+    
+    ENDIF
+
+    DOWHILE True:
+
+        DISPLAY("\n1. Settle payment for a car booking\n2. Return to previous screen\n\nEnter a choice: ")
+        READ decision
+
+        IF (decision == "1") THEN
+
+            DOWHILE True:
+
+                DISPLAY("Choose a car (car plate) to proceed payment: ")
+                READ choose_a_car
+
+                CONVERT choose_a_car to UPPERCASE FORMAT
+
+                READ find_car_booking FROM Booking.txt
+
+                LOOP choose_to_pay IN find_car_booking:
+
+                    STRIP choose_to_pay BY ""
+                    SPLIT choose_to_pay BY ","
+                    booking_info = choose_to_pay
+
+                    car_plate_payment = booking_info[1]
+
+                    username = booking_info[0]
+
+                    IF ((choose_a_car == car_plate_payment) and (username == user_name) and (booking_info[6] == "pending")) THEN
+
+                        break
+                    
+                    ENDIF
+
+                ENDLOOP
+
+                DOWHILE True:
+
+                    DISPLAY(f"\n{booking_info}\nIs this the car you would like to proceed payment with?(Y/N): ")
+                    READ payment_car_choice
+
+                    IF ((payment_car_choice == "Y") or (payment_car_choice == "y")) THEN
+
+                        READ carsfile_readlines FROM cars_details.txt
+
+                        LOOP line IN carsfile_readlines:
+
+                            STRIP car_info BY ""
+                            SPLIT car_info BY ","
+                            car_info = line 
+
+                            car_plate = car_info[0]
+
+                            IF (choose_a_car == car_plate) THEN
+
+                                MAP DATA (CONVERT booking_info[4] FORMAT into INTEGER and SPLIT booking_info[4] BY "-") TO year1, month1, day1
+
+                                MAP DATA (CONVERT booking_info[5] FORMAT into INTEGER and SPLIT booking_info[5] BY "-") TO year2, month2, day2
+
+                                CONVERT (year1, month1, day1) INTO datetime FORMAT AS d1
+
+                                CONVERT (year2, month2, day2) INTO datetime FORMAT AS d2
+
+                                bookDay = d2 - d1
+
+                                totalPrice = bookDay.days * int(car_info[7][2:])
+
+                                DISPLAY(f"Car Rent Start: {booking_info[4]}\nCar Rent End: {booking_info[5]}\nDays Rented: {bookDay.days} Days\nTotal Price: RM{totalPrice}\n")
+
+                                break
+
+                            ENDIF
+                            
+                        ENDLOOP
+
+                        DISPLAY("Do you want to confirm your payment? (Y/N): ")
+                        READ confirmation_input
+
+                        IF ((confirmation_input == "Y") or (confirmation_input == "y")) THEN
+
+                            DISPLAY("====================")
+
+                            DISPLAY("Payment Method\n\n1. Credit Card\n2. TouchNGO E-Wallet")
+
+                            DISPLAY("====================")
+
+                            DOWHILE True:
+
+                                DISPLAY("Choose one payment method: ")
+                                READ paymentChoice
+
+                                IF (paymentChoice == "1") THEN
+
+                                    paymentMethod = "Credit Card"
+
+                                    DISPLAY("Name on card: ")
+                                    READ cc_name
+
+                                    DOWHILE True:
+
+                                        DISPLAY("Credit card number: ")
+                                        READ cc_num
+
+                                        TRY:
+
+                                            cc_num1 = int(cc_num)
+
+                                        END TRY
+
+                                        except ValueError:
+
+                                            DISPLAY("Invalid Format, Only Integers.")
+
+                                            continue
+                                        
+                                        END EXCEPT
+
+                                        IF (length of cc_num == 14) THEN
+                                        
+                                            break
+
+                                        ELSE:
+
+                                            DISPLAY("Card Number Invalid.")
+
+                                            continue
+
+                                        ENDIF
+                                    
+                                    ENDDO
+
+                                    DOWHILE True:    
+
+                                        DISPLAY("Card Expiry Month: ")
+                                        READ cc_expiryMonth
+
+                                        TRY:
+
+                                            cc_expiryMonth1 = int(cc_expiryMonth)
+                                        
+                                        END TRY
+
+                                        except ValueError:
+
+                                            DISPLAY("Invalid Format, Only Integers.")
+                                            continue
+                                        END EXCEPT
+
+                                        IF (length of cc_expiryMonth == 2) THEN
+
+                                            break
+
+                                        ELSE:
+
+                                            DISPLAY("Value Invalid.")
+
+                                            continue            
+                                        
+                                        ENDIF
+                                    
+                                    ENDDO
+
+                                    DOWHILE True:          
+
+                                        DISPLAY("Card Expiry Year: ")
+                                        READ cc_expiryYear
+
+                                        TRY:  
+
+                                            cc_expiryYear1 = int(cc_expiryYear)
+                                        
+                                        END TRY
+
+                                        except ValueError:
+
+                                            DISPLAY("Invalid Format, Only Integers.")
+                                        
+                                        END EXCEPT
+
+                                        IF (length of cc_expiryYear == 2) THEN
+
+                                            break
+
+                                        ELSE:
+
+                                            DISPLAY("Value Invalid.")
+
+                                            continue     
+                                        
+                                        ENDIF
+                                    
+                                    ENDDO
+
+                                    DOWHILE True:     
+
+                                        DISPLAY("CVV: ")
+                                        READ cc_cvv
+
+                                        TRY:
+
+                                            cc_cvv1 = int(cc_cvv)
+
+                                        
+                                        END TRY
+
+                                        except ValueError:
+
+                                            DISPLAY("Invalid Format, Only Integers.")
+                                        
+                                        END EXCEPT
+
+                                        IF (length of cc_cvv == 3) THEN
+
+                                            break
+
+                                        ELSE:
+
+                                            DISPLAY("CVV Invalid.")
+
+                                            continue       
+
+                                        ENDIF
+
+                                    ENDDO
+
+                                    cc_expiry = str(f"{(cc_expiryMonth)}/{cc_expiryYear}")
+
+                                    DISPLAY("\n\nProcessing your payment.........\nPayment Done!")
+
+
+                                ELSEIF (paymentChoice == "2") THEN
+
+                                    paymentMethod = "TouchNGO E-Wallet"
+
+                                    DOWHILE True:
+
+                                        DISPLAY("TnG ID (8 digits): ")
+                                        READ tng_id
+
+                                        TRY:
+
+                                            tng_id1 = int(tng_id)
+
+                                            IF (length of tng_id == 8) THEN
+
+                                                break
+
+                                            ELSE:
+
+                                                DISPLAY("ID Invalid.")
+
+                                                continue
+                                            
+                                            END IF
+                                        
+                                        END TRY
+
+                                        except ValueError:
+
+                                            DISPLAY("Invalid Format, Only Integers.")
+
+                                            continue
+                                        
+                                        END EXCEPT
+
+                                    ENDDO
+
+                                    DOWHILE True:
+
+                                        DISPLAY("TnG Pin (6 digits): ")
+                                        READ tng_pin
+
+                                        TRY:
+
+                                            tng_pin1 = int(tng_pin)
+
+                                            IF (length of tng_pin == 6) THEN
+
+                                                break
+
+                                            ELSE:
+
+                                                DISPLAY("Pin Invalid.")
+
+                                                continue
+                                            
+                                            ENDIF
+                                        
+                                        END TRY
+
+                                        except ValueError:
+
+                                            DISPLAY("Invalid Format, Only Integers.")
+
+                                            continue       
+                                        
+                                        END EXCEPT
+                                    
+                                    ENDDO
+
+
+                                    DISPLAY("\n\nProcessing your payment.........\nPayment Done!")
+
+                                ELSE:
+
+                                    DISPLAY("Invalid Input")
+
+                                    continue
+                                
+                                ENDIF
+
+                                APPEND userpayment_fh FROM customerPayment.txt
+
+                                WRITE (f"{user_name},{choose_a_car},{booking_info[4]},{booking_info[5]},{bookDay.days},{paymentMethod},RM {totalPrice},{datetime.datetime.now().date()}\n") IN userpayment_fh
+
+                                CLOSE userpayment_fh
+
+                                READ edit_payment_status FROM Booking.txt
+
+                                DECLARE new_bookingdetails ""
+
+                                LOOP line IN edit_payment_status:
+
+                                    STRIP line BY ""
+                                    SPLIT line BY ","
+                                    check_pending = line
+                                    
+                                    IF (check_pending == booking_info) THEN
+
+                                        check_pending[6] = "paid"
+
+                                        JOIN (check_pending) BY "," AS new_line
+
+                                        new_bookingdetails += new_line + "\n"
+
+                                        
+
+                                    ELSE:
+
+                                        JOIN (check_pending) BY "," AS new_line
+
+                                        new_bookingdetails += new_line + "\n"
+
+                                    ENDIF
+                                
+                                END LOOP
+
+                                CLOSE edit_payment_status
+
+                                WRITE bookingdetails_fh FROM Booking.txt
+
+                                WRITE (new_bookingdetails) IN bookingdetails_fh
+
+                                CLOSE bookingdetails_fh
+
+                                login()
+
+                            ENDDO
+
+                        ELSEIF ((confirmation_input == "N") or (confirmation_input == "n")) THEN
+                            payment(customerUsername1)
+
+                        ELSE:
+
+                            DISPLAY("Invalid input.")
+
+                            continue
+
+                
+                        ENDIF
+        
+                    ELSEIF ((payment_car_choice == "N") or (payment_car_choice == "n")) THEN
+
+                        DISPLAY("Redirecting you back to customer panel")
+
+                        registered_customerPanel(customerUsername1)
+
+                    ELSE:
+
+                        DISPLAY("Invalid input. Enter a correct choice.")
+
+                        continue
+                    
+                    ENDIF
+                
+                ENDDO
+        
+            ENDDO
+
+
+        ELSEIF (decision == "2") THEN
+
+            registered_customerPanel(customerUsername1)
+
+        ELSE:
+
+            DISPLAY("Invalid INPUT.")
+
+            continue
+        
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+#Registered Customer Panel
+
+DEFINE FUNCTION registered_customerPanel(customerUsername1):
+
+    DISPLAY("What would you like to do today?")
+
+    DISPLAY("=================================================")
+
+    DISPLAY("1. Modify personal details")
+
+    DISPLAY("2. View Personal Rental History")
+
+    DISPLAY("3. View Detail of Cars to be Rented Out")
+
+    DISPLAY("4. Select and Book a car for a specific duration")
+
+    DISPLAY("5. Do payment to confirm Booking")
+
+    DISPLAY("6. Exit")
+
+    DISPLAY("=================================================")
+
+
+
+    DOWHILE True:
+
+        DISPLAY("Enter your choice: ")
+        READ registerCUS_INPUT
+
+        IF (registerCUS_INPUT == "1") THEN
+
+            modify_details(customerUsername1)
+
+        ELSEIF (registerCUS_INPUT == "2") THEN
+
+            rental_history(customerUsername1)
+
+        ELSEIF (registerCUS_INPUT == "3") THEN
+
+            cars_details(customerUsername1)
+
+        ELSEIF (registerCUS_INPUT == "4") THEN
+
+            select_book_car(customerUsername1)
+
+        ELSEIF (registerCUS_INPUT == "5") THEN
+
+            payment(customerUsername1)
+
+        ELSEIF (registerCUS_INPUT == "6") THEN
+
+            exit_panel()
+
+        ELSE:
+
+            DISPLAY("Enter a value between 1 to 6.")
+
+            continue
+
+        ENDIF
+    
+    ENDDO
+
+END FUNCTION
+
+#Unregistered User Panel
+
+DEFINE FUNCTION unregistered_customerPanel():
+
+    DISPLAY("===================================")
+
+    DISPLAY("1. View cars available for rent")
+
+    DISPLAY("2. Register to access other details")
+
+    DISPLAY("3. Login now if you have an account")
+
+    DISPLAY("4. Return to login screen")
+
+    DISPLAY("5. Exit")
+
+    DISPLAY("===================================")
+
+
+
+    DOWHILE True:
+
+        DISPLAY("Enter your choice: ")
+        READ unregisteredCUS_INPUT
+
+        IF (unregisteredCUS_INPUT == "1") THEN
+
+            cars_available()
+
+        ELSEIF (unregisteredCUS_INPUT == "2") THEN
+
+            register()
+
+        ELSEIF (unregisteredCUS_INPUT == "3") THEN
+
+            customerUsername = userLogin()
+
+            customerUsername1 = customerUsername
+
+            DISPLAY(f"Welcome {customerUsername1}!")
+
+            registered_customerPanel(customerUsername1)
+
+        ELSEIF (unregisteredCUS_INPUT == "4") THEN
+
+            login()
+
+        ELSEIF (unregisteredCUS_INPUT == "5") THEN
+
+            exit_panel()
+
+        ELSE:
+
+            DISPLAY("Enter a value between 1 to 5")
+
+            continue
+
+        ENDIF
+
+    ENDDO
+
+END FUNCTION
+
+update_car_status()
+
+update_car_rented()
+
+login()

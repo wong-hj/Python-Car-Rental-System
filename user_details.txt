@@ -1,0 +1,7 @@
+hj,222,0187775643,june@gmail.com
+kid,123,0194432567,kaito02@hotmail.com
+kelv,234,0198546643,kelv@gmail.com
+mannoj,567,0185643769,zerntan@gmail.com
+jimmy,neutron,0123456789,jimmy@gmail.com
+bob,mendes,0126987334,bob.mendes@gmail.com
+test,123,0126428462,test@yahoo.com

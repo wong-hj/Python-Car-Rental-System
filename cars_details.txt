@@ -1,0 +1,9 @@
+WRE 3344,Lamborghini,Urus,2002,yellow,76km/h,5,RM100,available
+WRT 2487,Honda,NSX,2010,indigo,60km/h,2,RM80,available
+WHJ 8866,Nissan,GTR R34,2013,violet,80km/h,4,RM60,available
+HUT 1887,Toyota,Camry,2019,lime,90km/h,5,RM23,available
+WTF 6294,Proton,X70,2021,superior white,70km/h,5,RM50,available
+TEO 1212,Bugatti,Chiron,2018,Yellow,250km/h,2,RM190,available
+RAY 0209,Porsche,Speed,2018,Black,250km/h,5,RM120,available
+WKY 0926,Perodua,Myvi,2018,Green,150km/h,5,RM30,available
+MAX 0818,Toyota,Hi-Ace,2010,White,120km/h,2,RM10,available
